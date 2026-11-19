@@ -65,16 +65,18 @@ public class RoundedButton extends JButton {
         int h = getHeight();
 
         Color fill = active
-                ? theme.getAccentPrimary()
+                ? (hovered ? theme.getAccentPrimary().brighter() : theme.getAccentPrimary())
                 : (hovered ? theme.getHiddenCellHover() : theme.getHiddenCellBg());
+        if (getModel().isPressed()) fill = fill.darker();
         Color border = active ? theme.getAccentPrimary() : theme.getPanelBorder();
-        Color textColor = active ? Color.WHITE : theme.getTextPrimary();
+        Color textColor = active ? new Color(39, 23, 43) : theme.getTextPrimary();
 
         g2.setColor(fill);
         g2.fillRoundRect(1, 1, w - 2, h - 2, radius, radius);
 
         g2.setColor(border);
-        g2.setStroke(new BasicStroke(active ? 2f : 1.2f));
+        g2.setStroke(new BasicStroke(hasFocus() ? 2f : 1f));
+        if (hasFocus()) g2.setColor(theme.getAccentSecondary());
         g2.drawRoundRect(1, 1, w - 2, h - 2, radius, radius);
 
         g2.setFont(getFont());

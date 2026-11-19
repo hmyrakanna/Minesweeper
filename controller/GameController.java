@@ -15,6 +15,7 @@ public class GameController {
     private int secondsElapsed;
     private final Timer gameTimer;
     private boolean timerRunning;
+    private long startTime;
 
     private GameEventListener eventListener;
 
@@ -30,7 +31,7 @@ public class GameController {
 
         this.gameTimer = new Timer(1000, e -> {
             if (timerRunning) {
-                secondsElapsed++;
+                updateElapsedTime();
                 if (eventListener != null) {
                     eventListener.onTimerTick(secondsElapsed);
                 }
@@ -67,9 +68,13 @@ public class GameController {
         if (board.getGameState() != GameState.PLAYING) {
             return;
         }
+        if (board.getCell(r, c).isFlagged() || board.getCell(r, c).isRevealed()) {
+            return;
+        }
 
         if (!timerRunning) {
             timerRunning = true;
+            startTime = System.nanoTime();
             gameTimer.start();
         }
 
@@ -95,12 +100,26 @@ public class GameController {
     private void checkState() {
         GameState state = board.getGameState();
         if (state != GameState.PLAYING) {
+            if (timerRunning) {
+                updateElapsedTime();
+            }
             timerRunning = false;
             gameTimer.stop();
             if (eventListener != null) {
+                eventListener.onTimerTick(secondsElapsed);
                 eventListener.onGameStatusChanged(state);
             }
         }
+    }
+
+    private void updateElapsedTime() {
+        secondsElapsed = (int) ((System.nanoTime() - startTime) / 1_000_000_000L);
+    }
+
+    public void dispose() {
+        gameTimer.stop();
+        timerRunning = false;
+        eventListener = null;
     }
 
     public Board getBoard() {

@@ -1,6 +1,7 @@
 package model;
 
-import java.util.LinkedList;
+import java.util.ArrayDeque;
+import java.util.Objects;
 import java.util.Queue;
 
 public class Board {
@@ -15,11 +16,17 @@ public class Board {
     private int revealedCellsCount = 0;
 
     public Board(int width, int height, int totalMines, MinePlacer minePlacer) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Недопустимий розмір поля");
+        }
+        if (totalMines < 0 || totalMines > width * height - Math.min(3, width) * Math.min(3, height)) {
+            throw new IllegalArgumentException("Недопустима кількість мін");
+        }
         this.width = width;
         this.height = height;
-        this.totalMines = Math.min(totalMines, width * height - 1);
+        this.totalMines = totalMines;
         this.grid = new Cell[height][width];
-        this.minePlacer = minePlacer;
+        this.minePlacer = Objects.requireNonNull(minePlacer);
 
         for (int row = 0; row < height; row++) {
             for (int col = 0; col < width; col++) {
@@ -44,6 +51,20 @@ public class Board {
         return totalMines;
     }
 
+    public int getRevealedCellsCount() {
+        return revealedCellsCount;
+    }
+
+    public int getRemainingMines() {
+        int flags = 0;
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                if (cell.isFlagged()) flags++;
+            }
+        }
+        return totalMines - flags;
+    }
+
     public Cell getCell(int row, int col) {
         return grid[row][col];
     }
@@ -61,13 +82,13 @@ public class Board {
         }
 
         if (cell.isMine()) {
-            cell.reveal();
+            cell.explode();
             gameState = GameState.LOST;
             revealAllMines();
             return;
         }
 
-        revealRecursive(row, col);
+        revealArea(row, col);
         checkWinCondition();
     }
 
@@ -76,8 +97,8 @@ public class Board {
         grid[row][col].toggleFlag();
     }
 
-    private void revealRecursive(int startR, int startC) {
-        Queue<Cell> queue = new LinkedList<>();
+    private void revealArea(int startR, int startC) {
+        Queue<Cell> queue = new ArrayDeque<>();
         Cell startCell = grid[startR][startC];
         if (startCell.isRevealed() || startCell.isFlagged()) return;
 

@@ -10,22 +10,22 @@ public class TwilightTheme implements GameTheme {
 
     @Override
     public Color getWindowBackground() {
-        return new Color(26, 18, 41);
+        return new Color(23, 18, 34);
     }
 
     @Override
     public Color getPanelBackground() {
-        return new Color(43, 30, 66);
+        return new Color(36, 27, 53);
     }
 
     @Override
     public Color getPanelBorder() {
-        return new Color(138, 92, 196);
+        return new Color(66, 48, 86);
     }
 
     @Override
     public Color getHiddenCellBg() {
-        return new Color(86, 65, 122);
+        return new Color(89, 68, 115);
     }
 
     @Override
@@ -35,27 +35,27 @@ public class TwilightTheme implements GameTheme {
 
     @Override
     public Color getHiddenCellBorder() {
-        return new Color(156, 122, 214);
+        return new Color(109, 86, 141);
     }
 
     @Override
     public Color getRevealedCellBg() {
-        return new Color(34, 24, 53);
+        return new Color(27, 21, 40);
     }
 
     @Override
     public Color getRevealedCellBorder() {
-        return new Color(64, 46, 94);
+        return new Color(47, 35, 66);
     }
 
     @Override
     public Color getAccentPrimary() {
-        return new Color(236, 122, 188);
+        return new Color(232, 143, 192);
     }
 
     @Override
     public Color getAccentSecondary() {
-        return new Color(168, 115, 245);
+        return new Color(196, 173, 245);
     }
 
     @Override

@@ -92,11 +92,17 @@ public class CellButton extends JButton {
 
             if (cell.isFlagged()) {
                 drawFlag(g2, w, h);
+                if (gameState == GameState.LOST && !cell.isMine()) {
+                    g2.setColor(theme.getMineColor());
+                    g2.setStroke(new BasicStroke(2.5f));
+                    g2.drawLine(w / 5, h / 5, w * 4 / 5, h * 4 / 5);
+                    g2.drawLine(w * 4 / 5, h / 5, w / 5, h * 4 / 5);
+                }
             } else {
-                drawSparkle(g2, w / 2f, h / 2f, Math.min(w, h) * 0.14f, theme.getTextMuted());
+                drawSparkle(g2, w / 2f, h / 2f, Math.min(w, h) * 0.11f, theme.getTextMuted());
             }
         } else {
-            g2.setColor(theme.getRevealedCellBg());
+            g2.setColor(cell.isExploded() ? theme.getMineColor().darker() : theme.getRevealedCellBg());
             g2.fillRoundRect(1, 1, w - 2, h - 2, arc, arc);
 
             g2.setColor(theme.getRevealedCellBorder());
@@ -138,7 +144,7 @@ public class CellButton extends JButton {
         int cy = h / 2;
         int r = Math.min(w, h) / 4;
 
-        g2.setColor(theme.getMineColor());
+        g2.setColor(cell.isExploded() ? Color.WHITE : theme.getMineColor());
         g2.fillOval(cx - r, cy - r, r * 2, r * 2);
 
         g2.setStroke(new BasicStroke(1.8f));

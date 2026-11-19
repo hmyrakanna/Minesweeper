@@ -6,6 +6,7 @@ public class Cell {
     private boolean isMine;
     private boolean isRevealed;
     private boolean isFlagged;
+    private boolean exploded;
     private int adjacentMines;
 
     public Cell(int row, int col) {
@@ -39,6 +40,16 @@ public class Cell {
 
     public boolean isFlagged() {
         return isFlagged;
+    }
+
+    public boolean isExploded() {
+        return exploded;
+    }
+
+    public void explode() {
+        if (isMine && reveal()) {
+            exploded = true;
+        }
     }
 
     public int getAdjacentMines() {

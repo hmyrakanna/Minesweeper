@@ -43,8 +43,14 @@ public class FileScoreRecord implements ScoreRecord {
         Integer currentBest = bestTimes.get(difficulty);
         if (currentBest == null || seconds < currentBest) {
             bestTimes.put(difficulty, seconds);
-            saveToFile();
-            return true;
+            if (saveToFile()) {
+                return true;
+            }
+            if (currentBest == null) {
+                bestTimes.remove(difficulty);
+            } else {
+                bestTimes.put(difficulty, currentBest);
+            }
         }
         return false;
     }
@@ -75,7 +81,7 @@ public class FileScoreRecord implements ScoreRecord {
         }
     }
 
-    private void saveToFile() {
+    private boolean saveToFile() {
         try (BufferedWriter writer = Files.newBufferedWriter(filePath, StandardCharsets.UTF_8)) {
             for (Map.Entry<Difficulty, Integer> entry : bestTimes.entrySet()) {
                 writer.write(entry.getKey().name() + "=" + entry.getValue());
@@ -83,6 +89,8 @@ public class FileScoreRecord implements ScoreRecord {
             }
         } catch (IOException e) {
             System.err.println("Error writing score record file: " + e.getMessage());
+            return false;
         }
+        return true;
     }
 }
