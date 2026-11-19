@@ -1,0 +1,65 @@
+package model;
+
+public class Cell {
+    private final int row;
+    private final int col;
+    private boolean isMine;
+    private boolean isRevealed;
+    private boolean isFlagged;
+    private int adjacentMines;
+
+    public Cell(int row, int col) {
+        this.row = row;
+        this.col = col;
+        this.isMine = false;
+        this.isRevealed = false;
+        this.isFlagged = false;
+        this.adjacentMines = 0;
+    }
+
+    public int getRow() {
+        return row;
+    }
+
+    public int getCol() {
+        return col;
+    }
+
+    public boolean isMine() {
+        return isMine;
+    }
+
+    public void setMine(boolean mine) {
+        isMine = mine;
+    }
+
+    public boolean isRevealed() {
+        return isRevealed;
+    }
+
+    public boolean isFlagged() {
+        return isFlagged;
+    }
+
+    public int getAdjacentMines() {
+        return adjacentMines;
+    }
+
+    public void setAdjacentMines(int adjacentMines) {
+        this.adjacentMines = adjacentMines;
+    }
+
+    public boolean reveal() {
+        if (isRevealed || isFlagged) {
+            return false;
+        }
+        isRevealed = true;
+        return true;
+    }
+
+    public void toggleFlag() {
+        if (!isRevealed) {
+            isFlagged = !isFlagged;
+        }
+    }
+}
