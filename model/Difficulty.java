@@ -1,10 +1,10 @@
 package model;
 
 public enum Difficulty {
-    BEGINNER("Beginner", 9, 9, 10),
-    INTERMEDIATE("Intermediate", 16, 16, 40),
-    EXPERT("Expert", 30, 16, 99),
-    CUSTOM("Custom", 0, 0, 0);
+    BEGINNER("Початківець", 9, 9, 10),
+    INTERMEDIATE("Умілець", 16, 16, 40),
+    EXPERT("Експерт", 30, 16, 99),
+    CUSTOM("Власне поле", 0, 0, 0);
 
     private final int width;
     private final int height;

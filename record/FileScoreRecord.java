@@ -13,6 +13,14 @@ public class FileScoreRecord implements ScoreRecord {
     private final Path filePath;
     private final Map<Difficulty, Integer> bestTimes = new EnumMap<>(Difficulty.class);
 
+    public FileScoreRecord() {
+        this(Path.of("records.properties"));
+    }
+
+    public FileScoreRecord(String fileName) {
+        this(Path.of(fileName));
+    }
+
     public FileScoreRecord(Path filePath) {
         this.filePath = filePath;
         loadfromFile();
@@ -50,7 +58,7 @@ public class FileScoreRecord implements ScoreRecord {
             String line;
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
-                    if (line.isEmpty() || line.contains("=")) {
+                    if (line.isEmpty() || !line.contains("=")) {
                         continue;
                     }
                     String[] parts = line.split("=", 2);
