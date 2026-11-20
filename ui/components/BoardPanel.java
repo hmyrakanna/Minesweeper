@@ -1,6 +1,7 @@
 package ui.components;
 
 import model.Board;
+import model.CellPosition;
 import model.GameState;
 import ui.theme.GameTheme;
 
@@ -23,12 +24,19 @@ public class BoardPanel extends RoundedPanel {
     private GameTheme theme;
     private CellButton[][] buttons;
     private Board board;
+    private final CardLayout cards = new CardLayout();
+    private final JPanel pausePanel = new JPanel(new GridBagLayout());
+    private final JLabel pauseTitle = new JLabel("Гру призупинено", SwingConstants.CENTER);
+    private final JLabel pauseSubtitle = new JLabel("Поле приховано, час зупинено", SwingConstants.CENTER);
+    private final RoundedButton resumeButton;
+    private boolean paused;
+    private CellPosition highlightedPosition;
 
-    public BoardPanel(GameTheme theme, CellClickListener listener) {
+    public BoardPanel(GameTheme theme, CellClickListener listener, Runnable resumeAction) {
         super(18, theme);
         this.theme = theme;
         this.listener = listener;
-        setLayout(new BorderLayout());
+        setLayout(cards);
         setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
         grid.setOpaque(false);
         scrollPane = new JScrollPane(grid);
@@ -37,11 +45,34 @@ public class BoardPanel extends RoundedPanel {
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.getVerticalScrollBar().setUnitIncrement(MIN_CELL + GAP);
         scrollPane.getHorizontalScrollBar().setUnitIncrement(MIN_CELL + GAP);
-        add(scrollPane, BorderLayout.CENTER);
+        add(scrollPane, "board");
+        pausePanel.setOpaque(false);
+        JPanel message = new JPanel();
+        message.setOpaque(false);
+        message.setLayout(new BoxLayout(message, BoxLayout.Y_AXIS));
+        pauseTitle.setFont(new Font("SansSerif", Font.BOLD, 26));
+        pauseSubtitle.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        pauseTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        pauseSubtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        message.add(pauseTitle);
+        message.add(Box.createVerticalStrut(10));
+        message.add(pauseSubtitle);
+        message.add(Box.createVerticalStrut(24));
+        resumeButton = new RoundedButton("▶ Продовжити", 12, theme);
+        resumeButton.setPreferredSize(new Dimension(180, 44));
+        resumeButton.setMaximumSize(new Dimension(180, 44));
+        resumeButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        resumeButton.setActive(true);
+        resumeButton.addActionListener(e -> resumeAction.run());
+        message.add(resumeButton);
+        pausePanel.add(message);
+        add(pausePanel, "paused");
+        setTheme(theme);
     }
 
     public void setBoard(Board board) {
         this.board = board;
+        highlightedPosition = null;
         grid.removeAll();
         grid.setLayout(new SquareGridLayout(board.getHeight(), board.getWidth()));
         buttons = new CellButton[board.getHeight()][board.getWidth()];
@@ -51,7 +82,7 @@ public class BoardPanel extends RoundedPanel {
                 button.addMouseListener(new MouseAdapter() {
                     @Override
                     public void mousePressed(MouseEvent e) {
-                        if (BoardPanel.this.board.getGameState() == GameState.PLAYING) {
+                        if (!paused && BoardPanel.this.board.getGameState() == GameState.PLAYING) {
                             listener.onCellClick(button.getRow(), button.getCol(), e);
                         }
                     }
@@ -80,10 +111,34 @@ public class BoardPanel extends RoundedPanel {
         repaint();
     }
 
+    public void setPaused(boolean value, boolean canResume) {
+        paused = value;
+        resumeButton.setEnabled(canResume);
+        cards.show(this, value ? "paused" : "board");
+    }
+
+    public void highlight(CellPosition position) {
+        if (buttons == null) return;
+        for (CellButton[] row : buttons) {
+            for (CellButton button : row) {
+                button.setHighlighted(position != null && button.getRow() == position.row()
+                        && button.getCol() == position.col());
+            }
+        }
+        if (position != null && !paused && !position.equals(highlightedPosition)) {
+            CellButton button = buttons[position.row()][position.col()];
+            SwingUtilities.invokeLater(() -> grid.scrollRectToVisible(button.getBounds()));
+        }
+        highlightedPosition = paused ? null : position;
+    }
+
     @Override
     public void setTheme(GameTheme theme) {
         super.setTheme(theme);
         this.theme = theme;
+        pauseTitle.setForeground(theme.getAccentPrimary());
+        pauseSubtitle.setForeground(theme.getTextMuted());
+        resumeButton.setTheme(theme);
         if (board != null) refresh(board);
     }
 

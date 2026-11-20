@@ -30,3 +30,4 @@ bin/
 .idea/
 .vscode/
 *.iml
+data/

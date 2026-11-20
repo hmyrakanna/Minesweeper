@@ -24,6 +24,7 @@ public class CellButton extends JButton {
     private GameState gameState = GameState.PLAYING;
     private GameTheme theme;
     private boolean hovered;
+    private boolean highlighted;
 
     public CellButton(int row, int col, Cell cell, GameTheme theme) {
         this.row = row;
@@ -70,6 +71,11 @@ public class CellButton extends JButton {
         repaint();
     }
 
+    public void setHighlighted(boolean highlighted) {
+        this.highlighted = highlighted;
+        repaint();
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         Graphics2D g2 = (Graphics2D) g.create();
@@ -83,11 +89,11 @@ public class CellButton extends JButton {
             Color bg = hovered && gameState == GameState.PLAYING
                     ? theme.getHiddenCellHover()
                     : theme.getHiddenCellBg();
-            g2.setColor(bg);
+            g2.setColor(highlighted ? new Color(46, 112, 81) : bg);
             g2.fillRoundRect(1, 1, w - 2, h - 2, arc, arc);
 
-            g2.setColor(theme.getHiddenCellBorder());
-            g2.setStroke(new BasicStroke(1.1f));
+            g2.setColor(highlighted ? new Color(129, 242, 175) : theme.getHiddenCellBorder());
+            g2.setStroke(new BasicStroke(highlighted ? 3f : 1.1f));
             g2.drawRoundRect(1, 1, w - 2, h - 2, arc, arc);
 
             if (cell.isFlagged()) {
@@ -99,7 +105,8 @@ public class CellButton extends JButton {
                     g2.drawLine(w * 4 / 5, h / 5, w / 5, h * 4 / 5);
                 }
             } else {
-                drawSparkle(g2, w / 2f, h / 2f, Math.min(w, h) * 0.11f, theme.getTextMuted());
+                drawSparkle(g2, w / 2f, h / 2f, Math.min(w, h) * 0.11f,
+                        highlighted ? new Color(204, 255, 220) : theme.getTextMuted());
             }
         } else {
             g2.setColor(cell.isExploded() ? theme.getMineColor().darker() : theme.getRevealedCellBg());

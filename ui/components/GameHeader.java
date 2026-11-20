@@ -11,8 +11,10 @@ public class GameHeader extends RoundedPanel {
     private final JLabel minesLabel = new JLabel("010", SwingConstants.CENTER);
     private final JLabel timerLabel = new JLabel("00:00", SwingConstants.CENTER);
     private final RoundedButton restartButton;
+    private final RoundedButton pauseButton;
+    private final RoundedButton hintButton;
 
-    public GameHeader(GameTheme theme, Runnable restartAction) {
+    public GameHeader(GameTheme theme, Runnable restartAction, Runnable pauseAction, Runnable hintAction) {
         super(18, theme);
         setLayout(new BorderLayout(12, 0));
         setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
@@ -22,12 +24,20 @@ public class GameHeader extends RoundedPanel {
         timerLabel.setFont(minesLabel.getFont());
 
         restartButton = new RoundedButton("↻ Нова гра", 12, theme);
-        restartButton.setPreferredSize(new Dimension(148, 40));
+        restartButton.setPreferredSize(new Dimension(112, 40));
         restartButton.setActive(true);
         restartButton.addActionListener(e -> restartAction.run());
-        JPanel middle = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 4));
+        pauseButton = new RoundedButton("Ⅱ Пауза", 12, theme);
+        pauseButton.setPreferredSize(new Dimension(112, 40));
+        pauseButton.addActionListener(e -> pauseAction.run());
+        hintButton = new RoundedButton("✦ Підказка 3", 12, theme);
+        hintButton.setPreferredSize(new Dimension(122, 40));
+        hintButton.addActionListener(e -> hintAction.run());
+        JPanel middle = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 4));
         middle.setOpaque(false);
         middle.add(restartButton);
+        middle.add(pauseButton);
+        middle.add(hintButton);
 
         add(createCounter(minesTitle, minesLabel), BorderLayout.WEST);
         add(middle, BorderLayout.CENTER);
@@ -38,7 +48,7 @@ public class GameHeader extends RoundedPanel {
     private JPanel createCounter(JLabel title, JLabel value) {
         JPanel counter = new JPanel(new BorderLayout(0, 2));
         counter.setOpaque(false);
-        counter.setPreferredSize(new Dimension(104, 48));
+        counter.setPreferredSize(new Dimension(72, 48));
         counter.add(title, BorderLayout.NORTH);
         counter.add(value, BorderLayout.CENTER);
         return counter;
@@ -52,6 +62,13 @@ public class GameHeader extends RoundedPanel {
         timerLabel.setText(String.format("%02d:%02d", seconds / 60, seconds % 60));
     }
 
+    public void updateActions(boolean playing, boolean paused, boolean canHint, int hintsLeft) {
+        pauseButton.setEnabled(playing);
+        pauseButton.setText(paused ? "▶ Далі" : "Ⅱ Пауза");
+        hintButton.setEnabled(canHint);
+        hintButton.setText("✦ Підказка " + hintsLeft);
+    }
+
     @Override
     public void setTheme(GameTheme theme) {
         super.setTheme(theme);
@@ -60,5 +77,7 @@ public class GameHeader extends RoundedPanel {
         minesLabel.setForeground(theme.getAccentPrimary());
         timerLabel.setForeground(theme.getAccentSecondary());
         restartButton.setTheme(theme);
+        pauseButton.setTheme(theme);
+        hintButton.setTheme(theme);
     }
 }

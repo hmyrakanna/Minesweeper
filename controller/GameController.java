@@ -1,132 +1,107 @@
 package controller;
 
-import model.Board;
-import model.GameState;
-import model.FirstClick;
-
-import javax.swing.Timer;
+import model.*;
+import storage.SavedGame;
+import java.util.EnumSet;
 
 public class GameController {
-    private Board board;
-    private final int width;
-    private final int height;
-    private final int totalMines;
-
-    private int secondsElapsed;
-    private final Timer gameTimer;
-    private boolean timerRunning;
-    private long startTime;
-
+    private final GameSession session;
+    private final GameTimer timer;
+    private final HintStrategy hintStrategy;
+    private final EnumSet<PauseReason> pauseReasons = EnumSet.noneOf(PauseReason.class);
     private GameEventListener eventListener;
 
     public interface GameEventListener {
         void onTimerTick(int seconds);
         void onGameStatusChanged(GameState state);
+        default void onSessionChanged() {}
     }
 
-    public GameController(int width, int height, int totalMines) {
-        this.width = width;
-        this.height = height;
-        this.totalMines = totalMines;
-
-        this.gameTimer = new Timer(1000, e -> {
-            if (timerRunning) {
-                updateElapsedTime();
-                if (eventListener != null) {
-                    eventListener.onTimerTick(secondsElapsed);
-                }
-            }
-        });
-
-        initNewGame();
+    public GameController(GameConfig config) {
+        this(new GameSession(config), 0, false, new SafeCellHint());
+    }
+    public GameController(SavedGame saved) {
+        this(saved.restore(), saved.elapsedMillis(), true, new SafeCellHint());
+    }
+    public GameController(GameSession session, long elapsedMillis, boolean paused, HintStrategy hintStrategy) {
+        this.session = session;
+        this.hintStrategy = hintStrategy;
+        timer = new GameTimer(this::publishTime);
+        timer.reset(elapsedMillis);
+        if (paused) pauseReasons.add(PauseReason.MANUAL);
+        updateTimerState();
     }
 
     public void setEventListener(GameEventListener listener) {
-        this.eventListener = listener;
-        if (eventListener != null) {
-            eventListener.onTimerTick(secondsElapsed);
-            eventListener.onGameStatusChanged(board.getGameState());
+        eventListener = listener;
+        publishTime();
+        publishSession();
+    }
+    public GameSession getSession() { return session; }
+    public Board getBoard() { return session.getBoard(); }
+    public int getSecondsElapsed() { return timer.elapsedSeconds(); }
+    public boolean isPaused() { return !pauseReasons.isEmpty(); }
+    public boolean isManuallyPaused() { return pauseReasons.contains(PauseReason.MANUAL); }
+    public boolean isPlaying() { return getBoard().getGameState() == GameState.PLAYING; }
+    public boolean hasStarted() { return getBoard().hasStarted(); }
+
+    public void addPause(PauseReason reason) {
+        if (!isPlaying()) return;
+        if (pauseReasons.add(reason)) {
+            updateTimerState();
+            publishSession();
         }
     }
-
-    public void initNewGame() {
-        this.board = new Board(width, height, totalMines, new FirstClick());
-        this.secondsElapsed = 0;
-        this.timerRunning = false;
-
-        if (gameTimer.isRunning()) {
-            gameTimer.stop();
-        }
-
-        if (eventListener != null) {
-            eventListener.onTimerTick(0);
-            eventListener.onGameStatusChanged(GameState.PLAYING);
+    public void removePause(PauseReason reason) {
+        if (pauseReasons.remove(reason)) {
+            updateTimerState();
+            publishSession();
         }
     }
-
-    public void handleCellClick(int r, int c) {
-        if (board.getGameState() != GameState.PLAYING) {
-            return;
-        }
-        if (board.getCell(r, c).isFlagged() || board.getCell(r, c).isRevealed()) {
-            return;
-        }
-
-        if (!timerRunning) {
-            timerRunning = true;
-            startTime = System.nanoTime();
-            gameTimer.start();
-        }
-
-        board.openCell(r, c);
-        checkState();
+    public void togglePause() {
+        if (isManuallyPaused()) removePause(PauseReason.MANUAL);
+        else addPause(PauseReason.MANUAL);
     }
-
-    public void handleRightClick(int r, int c) {
-        if (board.getGameState() != GameState.PLAYING) {
-            return;
-        }
-        board.toggleFlag(r, c);
+    public boolean canHint() {
+        return isPlaying() && !isPaused() && hasStarted() && session.getHintsRemaining() > 0 && session.getHint() == null;
     }
-
-    public void handleChordClick(int r, int c) {
-        if (board.getGameState() != GameState.PLAYING) {
-            return;
-        }
-        board.chord(r, c);
-        checkState();
+    public boolean requestHint() {
+        if (!canHint()) return false;
+        boolean accepted = hintStrategy.findHint(getBoard()).map(session::useHint).orElse(false);
+        if (accepted) publishSession();
+        return accepted;
     }
-
-    private void checkState() {
-        GameState state = board.getGameState();
-        if (state != GameState.PLAYING) {
-            if (timerRunning) {
-                updateElapsedTime();
-            }
-            timerRunning = false;
-            gameTimer.stop();
-            if (eventListener != null) {
-                eventListener.onTimerTick(secondsElapsed);
-                eventListener.onGameStatusChanged(state);
-            }
-        }
+    public void handleCellClick(int row, int col) {
+        if (!isPlaying() || isPaused()) return;
+        Cell cell = getBoard().getCell(row, col);
+        if (cell.isRevealed() || cell.isFlagged()) return;
+        if (!hasStarted()) timer.start();
+        getBoard().openCell(row, col);
+        afterMove();
     }
-
-    private void updateElapsedTime() {
-        secondsElapsed = (int) ((System.nanoTime() - startTime) / 1_000_000_000L);
+    public void handleRightClick(int row, int col) {
+        if (!isPlaying() || isPaused()) return;
+        getBoard().toggleFlag(row, col);
+        afterMove();
     }
-
-    public void dispose() {
-        gameTimer.stop();
-        timerRunning = false;
-        eventListener = null;
+    public void handleChordClick(int row, int col) {
+        if (!isPlaying() || isPaused()) return;
+        getBoard().chord(row, col);
+        afterMove();
     }
-
-    public Board getBoard() {
-        return board;
+    private void afterMove() {
+        session.refreshHint();
+        updateTimerState();
+        publishSession();
+        if (!isPlaying() && eventListener != null) eventListener.onGameStatusChanged(getBoard().getGameState());
     }
-
-    public int getSecondsElapsed() {
-        return secondsElapsed;
+    private void updateTimerState() {
+        if (isPlaying() && hasStarted() && !isPaused()) timer.start();
+        else timer.pause();
+        publishTime();
     }
+    private void publishTime() { if (eventListener != null) eventListener.onTimerTick(getSecondsElapsed()); }
+    private void publishSession() { if (eventListener != null) eventListener.onSessionChanged(); }
+    public SavedGame snapshot() { return SavedGame.from(session, timer.elapsedMillis()); }
+    public void dispose() { timer.pause(); eventListener = null; }
 }

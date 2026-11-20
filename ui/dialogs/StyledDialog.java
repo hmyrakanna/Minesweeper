@@ -13,7 +13,8 @@ public class StyledDialog extends JDialog {
     public StyledDialog(JFrame owner, String title, String subtitle, GameTheme theme) {
         super(owner, title, true);
         this.theme = theme;
-        setUndecorated(true);
+        // Native title bar makes every dialog movable and closable.
+        setUndecorated(false);
         setResizable(false);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));

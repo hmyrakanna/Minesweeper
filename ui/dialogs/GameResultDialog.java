@@ -10,7 +10,7 @@ import java.awt.*;
 public class GameResultDialog extends StyledDialog {
     public GameResultDialog(JFrame owner, GameTheme theme, GameState state,
                             int seconds, int revealed, int safeCells,
-                            boolean newRecord, Runnable restartAction) {
+                            boolean newRecord, int hintsUsed, Runnable restartAction) {
         super(owner, state == GameState.WON ? "Перемога" : "Поразка", "", theme);
         body.removeAll();
         boolean won = state == GameState.WON;
@@ -35,6 +35,8 @@ public class GameResultDialog extends StyledDialog {
         stats.add(label(newRecord ? "✦ Новий рекорд!" :
                         "Відкрито " + revealed + " з " + safeCells + " клітинок",
                 13, Font.BOLD, newRecord ? theme.getAccentPrimary() : theme.getTextMuted()));
+        stats.add(Box.createVerticalStrut(7));
+        stats.add(label("Використано підказок: " + hintsUsed + " / 3", 12, Font.PLAIN, theme.getTextMuted()));
         body.add(stats);
 
         RoundedButton again = actionButton(won ? "Грати ще" : "Спробувати ще", true, () -> {

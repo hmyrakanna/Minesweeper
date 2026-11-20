@@ -55,6 +55,50 @@ public class Board {
         return revealedCellsCount;
     }
 
+    public boolean hasStarted() {
+        return !isFirstClick;
+    }
+
+    // Compact, portable snapshot of a live board: mine, revealed and flag bits.
+    public String snapshot() {
+        if (gameState != GameState.PLAYING) throw new IllegalStateException("Гру завершено");
+        StringBuilder result = new StringBuilder(width * height);
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                int bits = (cell.isMine() ? 1 : 0) | (cell.isRevealed() ? 2 : 0)
+                        | (cell.isFlagged() ? 4 : 0);
+                result.append((char) ('0' + bits));
+            }
+        }
+        return result.toString();
+    }
+
+    public static Board restore(GameConfig config, boolean started, String snapshot) {
+        Board board = new Board(config.width(), config.height(), config.mines(), new FirstClick());
+        if (snapshot.length() != config.width() * config.height()) {
+            throw new IllegalArgumentException("Неправильний розмір збереження");
+        }
+        int mines = 0;
+        for (int i = 0; i < snapshot.length(); i++) {
+            int bits = snapshot.charAt(i) - '0';
+            if (bits < 0 || bits > 7 || (bits & 2) != 0 && (bits & 5) != 0
+                    || !started && (bits & 3) != 0) {
+                throw new IllegalArgumentException("Некоректний стан клітинки");
+            }
+            Cell cell = board.getCell(i / config.width(), i % config.width());
+            if ((bits & 1) != 0) { cell.setMine(true); mines++; }
+            if ((bits & 2) != 0) { cell.reveal(); board.revealedCellsCount++; }
+            if ((bits & 4) != 0) cell.toggleFlag();
+        }
+        if (mines != (started ? config.mines() : 0)
+                || started && (board.revealedCellsCount == 0 || board.revealedCellsCount >= config.safeCells())) {
+            throw new IllegalArgumentException("Некоректний стан поля");
+        }
+        board.isFirstClick = !started;
+        if (started) board.calculateAdjacentMines();
+        return board;
+    }
+
     public int getRemainingMines() {
         int flags = 0;
         for (Cell[] row : grid) {

@@ -70,6 +70,11 @@ public class RoundedButton extends JButton {
         if (getModel().isPressed()) fill = fill.darker();
         Color border = active ? theme.getAccentPrimary() : theme.getPanelBorder();
         Color textColor = active ? new Color(39, 23, 43) : theme.getTextPrimary();
+        if (!isEnabled()) {
+            fill = theme.getPanelBackground();
+            border = theme.getPanelBorder();
+            textColor = theme.getTextMuted();
+        }
 
         g2.setColor(fill);
         g2.fillRoundRect(1, 1, w - 2, h - 2, radius, radius);
