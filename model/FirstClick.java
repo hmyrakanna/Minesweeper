@@ -5,12 +5,12 @@ import java.util.List;
 
 public class FirstClick implements MinePlacer {
     @Override
-    public void placeMines(Cell[][] grid, int width, int height, int totalMines, int safeRow, int safeCol) {
+    public void placeMines(Cell[][] grid, int totalMines, int safeRow, int safeCol) {
         List<Cell> candidates = new ArrayList<>();
-        for (int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-                if (Math.abs(row - safeRow) > 1 || Math.abs(col - safeCol) > 1) {
-                    candidates.add(grid[row][col]);
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                if (Math.abs(cell.getRow() - safeRow) > 1 || Math.abs(cell.getCol() - safeCol) > 1) {
+                    candidates.add(cell);
                 }
             }
         }

@@ -14,21 +14,14 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 public class CellButton extends JButton {
-    private final int row;
-    private final int col;
-    private Cell cell;
+    private final Cell cell;
     private GameState gameState = GameState.PLAYING;
     private GameTheme theme;
-    private boolean hovered;
     private boolean highlighted;
 
-    public CellButton(int row, int col, Cell cell, GameTheme theme) {
-        this.row = row;
-        this.col = col;
+    public CellButton(Cell cell, GameTheme theme) {
         this.cell = cell;
         this.theme = theme;
 
@@ -41,31 +34,18 @@ public class CellButton extends JButton {
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setFont(new Font("SansSerif", Font.BOLD, 14));
 
-        addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                hovered = true;
-                repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                hovered = false;
-                repaint();
-            }
-        });
+        setRolloverEnabled(true);
     }
 
     public int getRow() {
-        return row;
+        return cell.getRow();
     }
 
     public int getCol() {
-        return col;
+        return cell.getCol();
     }
 
-    public void sync(Cell cell, GameState gameState, GameTheme theme) {
-        this.cell = cell;
+    public void sync(GameState gameState, GameTheme theme) {
         this.gameState = gameState;
         this.theme = theme;
         repaint();
@@ -86,7 +66,7 @@ public class CellButton extends JButton {
         int arc = 8;
 
         if (!cell.isRevealed()) {
-            Color bg = hovered && gameState == GameState.PLAYING
+            Color bg = getModel().isRollover() && gameState == GameState.PLAYING
                     ? theme.getHiddenCellHover()
                     : theme.getHiddenCellBg();
             g2.setColor(highlighted ? new Color(46, 112, 81) : bg);
@@ -105,7 +85,7 @@ public class CellButton extends JButton {
                     g2.drawLine(w * 4 / 5, h / 5, w / 5, h * 4 / 5);
                 }
             } else {
-                drawSparkle(g2, w / 2f, h / 2f, Math.min(w, h) * 0.11f,
+                drawSparkle(g2, w / 2, h / 2, Math.round(Math.min(w, h) * 0.11f),
                         highlighted ? new Color(204, 255, 220) : theme.getTextMuted());
             }
         } else {
@@ -159,28 +139,11 @@ public class CellButton extends JButton {
         g2.drawLine(cx, cy - r - 3, cx, cy + r + 3);
     }
 
-    private void drawSparkle(Graphics2D g2, float cx, float cy, float size, Color color) {
+    private void drawSparkle(Graphics2D g2, int cx, int cy, int size, Color color) {
         g2.setColor(color);
-        int[] xs = {
-                Math.round(cx),
-                Math.round(cx + size * 0.35f),
-                Math.round(cx + size),
-                Math.round(cx + size * 0.35f),
-                Math.round(cx),
-                Math.round(cx - size * 0.35f),
-                Math.round(cx - size),
-                Math.round(cx - size * 0.35f)
-        };
-        int[] ys = {
-                Math.round(cy - size),
-                Math.round(cy - size * 0.35f),
-                Math.round(cy),
-                Math.round(cy + size * 0.35f),
-                Math.round(cy + size),
-                Math.round(cy + size * 0.35f),
-                Math.round(cy),
-                Math.round(cy - size * 0.35f)
-        };
+        int small = Math.max(1, Math.round(size * 0.35f));
+        int[] xs = {cx, cx + small, cx + size, cx + small, cx, cx - small, cx - size, cx - small};
+        int[] ys = {cy - size, cy - small, cy, cy + small, cy + size, cy + small, cy, cy - small};
         g2.fillPolygon(xs, ys, 8);
     }
 }

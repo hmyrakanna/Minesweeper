@@ -1,33 +1,27 @@
 package model;
 
 import java.util.ArrayDeque;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 
 public class Board {
-    private final int width;
-    private final int height;
-    private final int totalMines;
+    private final int width, height, totalMines;
     private final Cell[][] grid;
     private final MinePlacer minePlacer;
-
-    private boolean isFirstClick = true;
+    private boolean started;
     private GameState gameState = GameState.PLAYING;
-    private int revealedCellsCount = 0;
 
-    public Board(int width, int height, int totalMines, MinePlacer minePlacer) {
-        if (width <= 0 || height <= 0) {
-            throw new IllegalArgumentException("Недопустимий розмір поля");
-        }
-        if (totalMines < 0 || totalMines > width * height - Math.min(3, width) * Math.min(3, height)) {
-            throw new IllegalArgumentException("Недопустима кількість мін");
-        }
-        this.width = width;
-        this.height = height;
-        this.totalMines = totalMines;
-        this.grid = new Cell[height][width];
-        this.minePlacer = Objects.requireNonNull(minePlacer);
+    public Board(GameConfig config) {
+        this(config, new FirstClick());
+    }
 
+    public Board(GameConfig config, MinePlacer minePlacer) {
+        width = config.width();
+        height = config.height();
+        totalMines = config.mines();
+        this.minePlacer = minePlacer;
+        grid = new Cell[height][width];
         for (int row = 0; row < height; row++) {
             for (int col = 0; col < width; col++) {
                 grid[row][col] = new Cell(row, col);
@@ -35,233 +29,161 @@ public class Board {
         }
     }
 
-    public GameState getGameState() {
-        return gameState;
-    }
-
-    public int getWidth() {
-        return width;
-    }
-
-    public int getHeight() {
-        return height;
-    }
-
-    public int getTotalMines() {
-        return totalMines;
-    }
+    public int getWidth() { return width; }
+    public int getHeight() { return height; }
+    public int getTotalMines() { return totalMines; }
+    public GameState getGameState() { return gameState; }
+    public boolean hasStarted() { return started; }
+    public Cell getCell(int row, int col) { return grid[row][col]; }
 
     public int getRevealedCellsCount() {
-        return revealedCellsCount;
-    }
-
-    public boolean hasStarted() {
-        return !isFirstClick;
-    }
-
-    // Compact, portable snapshot of a live board: mine, revealed and flag bits.
-    public String snapshot() {
-        if (gameState != GameState.PLAYING) throw new IllegalStateException("Гру завершено");
-        StringBuilder result = new StringBuilder(width * height);
+        int count = 0;
         for (Cell[] row : grid) {
             for (Cell cell : row) {
-                int bits = (cell.isMine() ? 1 : 0) | (cell.isRevealed() ? 2 : 0)
-                        | (cell.isFlagged() ? 4 : 0);
-                result.append((char) ('0' + bits));
+                if (cell.isRevealed() && !cell.isMine()) count++;
             }
+        }
+        return count;
+    }
+
+    public int getRemainingMines() {
+        int remaining = totalMines;
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                if (cell.isFlagged()) remaining--;
+            }
+        }
+        return remaining;
+    }
+
+    private List<Cell> neighbors(Cell cell) {
+        List<Cell> result = new ArrayList<>();
+        for (int row = cell.getRow() - 1; row <= cell.getRow() + 1; row++) {
+            for (int col = cell.getCol() - 1; col <= cell.getCol() + 1; col++) {
+                if (row < 0 || row >= height || col < 0 || col >= width) continue;
+                if (grid[row][col] != cell) result.add(grid[row][col]);
+            }
+        }
+        return result;
+    }
+
+    public void openCell(int row, int col) {
+        if (gameState != GameState.PLAYING) return;
+        Cell cell = getCell(row, col);
+        if (!cell.isClosed()) return;
+
+        if (!started) {
+            minePlacer.placeMines(grid, totalMines, row, col);
+            calculateAdjacentMines();
+            started = true;
+        }
+        if (cell.isMine()) {
+            cell.explode();
+            gameState = GameState.LOST;
+            revealAllMines();
+        } else {
+            revealArea(cell);
+            checkWin();
+        }
+    }
+
+    public void toggleFlag(int row, int col) {
+        if (gameState == GameState.PLAYING) getCell(row, col).toggleFlag();
+    }
+
+    private void revealArea(Cell start) {
+        Queue<Cell> queue = new ArrayDeque<>();
+        start.reveal();
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            Cell current = queue.remove();
+            if (current.getAdjacentMines() != 0) continue;
+            for (Cell neighbor : neighbors(current)) {
+                if (neighbor.isSafeClosed()) {
+                    neighbor.reveal();
+                    queue.add(neighbor);
+                }
+            }
+        }
+    }
+
+    private void calculateAdjacentMines() {
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                if (cell.isMine()) continue;
+                int count = 0;
+                for (Cell neighbor : neighbors(cell)) {
+                    if (neighbor.isMine()) count++;
+                }
+                cell.setAdjacentMines(count);
+            }
+        }
+    }
+
+    private void revealAllMines() {
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                if (cell.isMine()) cell.reveal();
+            }
+        }
+    }
+
+    private void checkWin() {
+        if (getRevealedCellsCount() != width * height - totalMines) return;
+        gameState = GameState.WON;
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                if (cell.isMine() && !cell.isFlagged()) cell.toggleFlag();
+            }
+        }
+    }
+
+    public void chord(int row, int col) {
+        if (gameState != GameState.PLAYING) return;
+        Cell cell = getCell(row, col);
+        if (!cell.isRevealed() || cell.getAdjacentMines() == 0) return;
+        List<Cell> nearby = neighbors(cell);
+        int flags = 0;
+        for (Cell neighbor : nearby) {
+            if (neighbor.isFlagged()) flags++;
+        }
+        if (flags == cell.getAdjacentMines()) {
+            for (Cell neighbor : nearby) {
+                openCell(neighbor.getRow(), neighbor.getCol());
+            }
+        }
+    }
+
+    public String snapshot() {
+        if (gameState != GameState.PLAYING) throw new IllegalStateException("Гру завершено");
+        StringBuilder result = new StringBuilder();
+        for (Cell[] row : grid) {
+            for (Cell cell : row) result.append(cell.saveCode());
         }
         return result.toString();
     }
 
     public static Board restore(GameConfig config, boolean started, String snapshot) {
-        Board board = new Board(config.width(), config.height(), config.mines(), new FirstClick());
+        Board board = new Board(config);
         if (snapshot.length() != config.width() * config.height()) {
             throw new IllegalArgumentException("Неправильний розмір збереження");
         }
-        int mines = 0;
-        for (int i = 0; i < snapshot.length(); i++) {
-            int bits = snapshot.charAt(i) - '0';
-            if (bits < 0 || bits > 7 || (bits & 2) != 0 && (bits & 5) != 0
-                    || !started && (bits & 3) != 0) {
-                throw new IllegalArgumentException("Некоректний стан клітинки");
+        int index = 0, mines = 0;
+        for (Cell[] row : board.grid) {
+            for (Cell cell : row) {
+                cell.restoreCode(snapshot.charAt(index++));
+                if (cell.isMine()) mines++;
+                if (!started && (cell.isMine() || cell.isRevealed())) {
+                    throw new IllegalArgumentException("Некоректний стан першого ходу");
+                }
             }
-            Cell cell = board.getCell(i / config.width(), i % config.width());
-            if ((bits & 1) != 0) { cell.setMine(true); mines++; }
-            if ((bits & 2) != 0) { cell.reveal(); board.revealedCellsCount++; }
-            if ((bits & 4) != 0) cell.toggleFlag();
         }
-        if (mines != (started ? config.mines() : 0)
-                || started && (board.revealedCellsCount == 0 || board.revealedCellsCount >= config.safeCells())) {
+        int revealed = board.getRevealedCellsCount();
+        if (started && (mines != config.mines() || revealed == 0 || revealed >= config.safeCells())) {
             throw new IllegalArgumentException("Некоректний стан поля");
         }
-        board.isFirstClick = !started;
+        board.started = started;
         if (started) board.calculateAdjacentMines();
         return board;
     }
-
-    public int getRemainingMines() {
-        int flags = 0;
-        for (Cell[] row : grid) {
-            for (Cell cell : row) {
-                if (cell.isFlagged()) flags++;
-            }
-        }
-        return totalMines - flags;
-    }
-
-    public Cell getCell(int row, int col) {
-        return grid[row][col];
-    }
-
-    public void openCell(int row, int col) {
-        if (gameState != GameState.PLAYING) return;
-
-        Cell cell = grid[row][col];
-        if (cell.isRevealed() || cell.isFlagged()) return;
-
-        if (isFirstClick) {
-            minePlacer.placeMines(grid, width, height, totalMines, row, col);
-            calculateAdjacentMines();
-            isFirstClick = false;
-        }
-
-        if (cell.isMine()) {
-            cell.explode();
-            gameState = GameState.LOST;
-            revealAllMines();
-            return;
-        }
-
-        revealArea(row, col);
-        checkWinCondition();
-    }
-
-    public void toggleFlag(int row, int col) {
-        if (gameState != GameState.PLAYING) return;
-        grid[row][col].toggleFlag();
-    }
-
-    private void revealArea(int startR, int startC) {
-        Queue<Cell> queue = new ArrayDeque<>();
-        Cell startCell = grid[startR][startC];
-        if (startCell.isRevealed() || startCell.isFlagged()) return;
-
-        queue.add(startCell);
-
-        while (!queue.isEmpty()) {
-            Cell current = queue.poll();
-            if (current.isRevealed() || current.isFlagged()) continue;
-
-            if (current.reveal()) {
-                revealedCellsCount++;
-            }
-
-            if (current.getAdjacentMines() == 0) {
-                for (int dr = -1; dr <= 1; dr++) {
-                    for (int dc = -1; dc <= 1; dc++) {
-                        if (dr == 0 && dc == 0) continue;
-                        int newRow = current.getRow() + dr;
-                        int newCol = current.getCol() + dc;
-                        if (isValid(newRow, newCol)) {
-                            Cell neighbor = grid[newRow][newCol];
-                            if (!neighbor.isRevealed() && !neighbor.isFlagged() && !neighbor.isMine()) {
-                                queue.add(neighbor);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-        private void calculateAdjacentMines() {
-            for (int row = 0; row < height; row++) {
-                for (int col = 0; col < width; col++) {
-                    if (grid[row][col].isMine()) continue;
-
-                    int count = 0;
-                    for (int dr = -1; dr <= 1; dr++) {
-                        for (int dc = -1; dc <= 1; dc++) {
-                            if (dr == 0 && dc == 0) continue;
-                            int newRow = row + dr;
-                            int newCol = col + dc;
-                            if (isValid(newRow, newCol) && grid[newRow][newCol].isMine()) {
-                                count++;
-                            }
-                        }
-                    }
-
-                    grid[row][col].setAdjacentMines(count);
-                }
-            }
-        }
-
-        private boolean isValid(int row, int col) {
-            return row >= 0 && row < height && col >= 0 && col < width;
-        }
-
-        private void revealAllMines() {
-            for (int row = 0; row < height; row++) {
-                for (int col = 0; col < width; col++) {
-                    if (grid[row][col].isMine()) {
-                        grid[row][col].reveal();
-                    }
-                }
-            }
-        }
-
-        private void checkWinCondition() {
-            int totalCells = width * height;
-            if (revealedCellsCount == totalCells - totalMines) {
-                gameState = GameState.WON;
-                flagAllRemainingMines();
-            }
-        }
-
-        private void flagAllRemainingMines() {
-            for (int row = 0; row < height; row++) {
-                for (int col = 0; col < width; col++) {
-                    Cell cell = grid[row][col];
-                    if (cell.isMine() && !cell.isFlagged()) {
-                        cell.toggleFlag();
-                    }
-                }
-            }
-        }
-    
-    public void chord(int row, int col) {
-        if (gameState != GameState.PLAYING) return;
-
-        Cell cell = grid[row][col];
-        if (!cell.isRevealed() || cell.getAdjacentMines() == 0) return;
-
-        int flaggedCount = 0;
-        for (int dr = -1; dr <= 1; dr++) {
-            for (int dc = -1; dc <= 1; dc++) {
-                if (dr == 0 && dc == 0) continue;
-                int newRow = row + dr;
-                int newCol = col + dc;
-                if (isValid(newRow, newCol) && grid[newRow][newCol].isFlagged()) {
-                    flaggedCount++;
-                }
-            }
-        }
-
-        if (flaggedCount == cell.getAdjacentMines()) {
-            for (int dr = -1; dr <= 1; dr++) {
-                for (int dc = -1; dc <= 1; dc++) {
-                    if (dr == 0 && dc == 0) continue;
-                    int newRow = row + dr;
-                    int newCol = col + dc;
-                    if (isValid(newRow, newCol)) {
-                        Cell neighbor = grid[newRow][newCol];
-                        if (!neighbor.isRevealed() && !neighbor.isFlagged()) {
-                            openCell(newRow, newCol);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
-

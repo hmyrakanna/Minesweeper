@@ -45,12 +45,11 @@ public class GameController {
     public boolean isPlaying() { return getBoard().getGameState() == GameState.PLAYING; }
     public boolean hasStarted() { return getBoard().hasStarted(); }
 
-    public void addPause(PauseReason reason) {
-        if (!isPlaying()) return;
-        if (pauseReasons.add(reason)) {
-            updateTimerState();
-            publishSession();
-        }
+    public boolean addPause(PauseReason reason) {
+        if (!isPlaying() || !pauseReasons.add(reason)) return false;
+        updateTimerState();
+        publishSession();
+        return true;
     }
     public void removePause(PauseReason reason) {
         if (pauseReasons.remove(reason)) {
@@ -67,14 +66,15 @@ public class GameController {
     }
     public boolean requestHint() {
         if (!canHint()) return false;
-        boolean accepted = hintStrategy.findHint(getBoard()).map(session::useHint).orElse(false);
-        if (accepted) publishSession();
-        return accepted;
+        CellPosition position = hintStrategy.findHint(getBoard());
+        if (!session.useHint(position)) return false;
+        publishSession();
+        return true;
     }
     public void handleCellClick(int row, int col) {
         if (!isPlaying() || isPaused()) return;
         Cell cell = getBoard().getCell(row, col);
-        if (cell.isRevealed() || cell.isFlagged()) return;
+        if (!cell.isClosed()) return;
         if (!hasStarted()) timer.start();
         getBoard().openCell(row, col);
         afterMove();

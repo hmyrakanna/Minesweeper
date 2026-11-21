@@ -11,14 +11,11 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 public class RoundedButton extends JButton {
     private final int radius;
     private GameTheme theme;
     private boolean active;
-    private boolean hovered;
 
     public RoundedButton(String text, int radius, GameTheme theme) {
         super(text);
@@ -31,19 +28,7 @@ public class RoundedButton extends JButton {
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setFont(new Font("SansSerif", Font.BOLD, 13));
 
-        addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                hovered = true;
-                repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                hovered = false;
-                repaint();
-            }
-        });
+        setRolloverEnabled(true);
     }
 
     public void setTheme(GameTheme theme) {
@@ -64,6 +49,7 @@ public class RoundedButton extends JButton {
         int w = getWidth();
         int h = getHeight();
 
+        boolean hovered = getModel().isRollover();
         Color fill = active
                 ? (hovered ? theme.getAccentPrimary().brighter() : theme.getAccentPrimary())
                 : (hovered ? theme.getHiddenCellHover() : theme.getHiddenCellBg());

@@ -59,7 +59,9 @@ public class DifficultyPanel extends RoundedPanel {
     }
 
     public void setSelected(Difficulty selected) {
-        buttons.forEach((difficulty, button) -> button.setActive(difficulty == selected));
+        for (Difficulty difficulty : buttons.keySet()) {
+            buttons.get(difficulty).setActive(difficulty == selected);
+        }
     }
 
     @Override
@@ -68,6 +70,6 @@ public class DifficultyPanel extends RoundedPanel {
         title.setForeground(theme.getTextMuted());
         controlsTitle.setForeground(theme.getTextMuted());
         for (JLabel hint : hints) hint.setForeground(theme.getTextPrimary());
-        buttons.values().forEach(button -> button.setTheme(theme));
+        for (RoundedButton button : buttons.values()) button.setTheme(theme);
     }
 }

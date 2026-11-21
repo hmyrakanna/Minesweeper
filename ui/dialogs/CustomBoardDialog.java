@@ -5,7 +5,6 @@ import ui.components.*;
 import ui.theme.GameTheme;
 import javax.swing.*;
 import java.awt.*;
-import java.util.Optional;
 
 public class CustomBoardDialog extends StyledDialog {
     private int width = 12, height = 12;
@@ -62,8 +61,7 @@ public class CustomBoardDialog extends StyledDialog {
         minesLabel.setText(mines.isEnabled() ? String.format("Міни: %d  (%.0f%% поля)", mines.getValue(),
                 100.0 * mines.getValue() / (width * height)) : "Спочатку виберіть допустимий розмір");
     }
-    public Optional<GameConfig> choose() {
-        showDialog();
-        return Optional.ofNullable(result);
+    public GameConfig getConfig() {
+        return result;
     }
 }

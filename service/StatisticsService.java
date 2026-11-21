@@ -1,40 +1,61 @@
 package service;
 
 import model.*;
-import storage.GameHistoryRepository;
+import storage.GameStorage;
 import java.io.IOException;
 import java.util.*;
 
 public class StatisticsService {
-    private final GameHistoryRepository repository;
+    private final GameStorage storage;
     private final List<GameResult> history;
-    public StatisticsService(GameHistoryRepository repository) throws IOException {
-        this.repository = repository;
-        history = new ArrayList<>(repository.load());
+    private final Map<Difficulty, Integer> legacyRecords;
+
+    public StatisticsService(GameStorage storage) throws IOException {
+        this.storage = storage;
+        history = storage.loadHistory();
+        legacyRecords = storage.loadLegacyRecords();
     }
-    public boolean contains(UUID id) { return history.stream().anyMatch(r -> r.id().equals(id)); }
+    public boolean contains(UUID id) {
+        for (GameResult result : history) {
+            if (result.id().equals(id)) return true;
+        }
+        return false;
+    }
     public void record(GameResult result) throws IOException {
         if (contains(result.id())) return;
         List<GameResult> updated = new ArrayList<>(history);
         updated.add(result);
-        repository.save(updated);
+        storage.saveHistory(updated);
         history.add(result);
     }
     public List<GameResult> history() {
-        return history.stream().sorted(Comparator.comparing(GameResult::date).reversed()).toList();
+        List<GameResult> result = new ArrayList<>(history);
+        result.sort(Comparator.comparing(GameResult::date).reversed());
+        return result;
     }
     public List<GameResult> records(Difficulty difficulty) {
-        return history.stream().filter(r -> r.qualifiesForRecord() && r.config().difficulty() == difficulty)
-                .sorted(Comparator.comparingInt(GameResult::seconds).thenComparing(GameResult::date)).limit(10).toList();
+        List<GameResult> result = new ArrayList<>();
+        for (GameResult game : history) {
+            if (game.qualifiesForRecord() && game.config().difficulty() == difficulty) result.add(game);
+        }
+        result.sort(Comparator.comparingInt(GameResult::seconds).thenComparing(GameResult::date));
+        return result.subList(0, Math.min(10, result.size()));
     }
     public boolean isNewRecord(GameResult result) {
-        return result.qualifiesForRecord() && records(result.config().difficulty()).stream()
-                .noneMatch(r -> r.seconds() <= result.seconds());
+        if (!result.qualifiesForRecord()) return false;
+        Difficulty difficulty = result.config().difficulty();
+        Integer legacy = legacyRecords.get(difficulty);
+        if (legacy != null && legacy <= result.seconds()) return false;
+        List<GameResult> top = records(difficulty);
+        return top.isEmpty() || result.seconds() < top.get(0).seconds();
     }
+    public Integer getLegacyRecord(Difficulty difficulty) { return legacyRecords.get(difficulty); }
     public Summary summary() {
         int wins = 0, losses = 0, abandoned = 0, streak = 0, bestStreak = 0, hints = 0;
         long seconds = 0;
-        for (GameResult r : history.stream().sorted(Comparator.comparing(GameResult::date)).toList()) {
+        List<GameResult> ordered = new ArrayList<>(history);
+        ordered.sort(Comparator.comparing(GameResult::date));
+        for (GameResult r : ordered) {
             seconds += r.seconds();
             hints += r.hintsUsed();
             switch (r.outcome()) {

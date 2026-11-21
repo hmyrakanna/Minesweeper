@@ -9,11 +9,11 @@ import java.awt.event.KeyEvent;
 public class StyledDialog extends JDialog {
     protected final GameTheme theme;
     protected final JPanel body = new JPanel();
+    private boolean confirmed;
 
     public StyledDialog(JFrame owner, String title, String subtitle, GameTheme theme) {
         super(owner, title, true);
         this.theme = theme;
-        // Native title bar makes every dialog movable and closable.
         setUndecorated(false);
         setResizable(false);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
@@ -43,9 +43,15 @@ public class StyledDialog extends JDialog {
         return label;
     }
 
-    public JPanel getBody() {
-        return body;
+    public void addConfirmation(String accept) {
+        addActions(actionButton("Скасувати", false, this::dispose),
+                actionButton(accept, true, () -> {
+                    confirmed = true;
+                    dispose();
+                }));
     }
+
+    public boolean isConfirmed() { return confirmed; }
 
     public RoundedButton actionButton(String text, boolean primary, Runnable action) {
         RoundedButton button = new RoundedButton(text, 12, theme);

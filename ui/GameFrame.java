@@ -2,8 +2,6 @@ package ui;
 
 import controller.*;
 import model.*;
-import record.FileScoreRecord;
-import record.ScoreRecord;
 import service.StatisticsService;
 import storage.*;
 import ui.components.*;
@@ -15,13 +13,9 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Optional;
-import java.util.function.Supplier;
 
 public class GameFrame extends JFrame implements GameController.GameEventListener {
-    private final ScoreRecord legacyRecords = new FileScoreRecord();
-    private final GameSaveRepository saves = new FileGameSaveRepository(Path.of("data", "saved-game.properties"));
-    private final SettingsRepository settings = new SettingsRepository(Path.of("data", "theme.txt"));
+    private final GameStorage storage = new GameStorage(Path.of("data"));
     private StatisticsService statistics;
     private GameTheme theme = new TwilightTheme();
     private GameController controller;
@@ -47,12 +41,12 @@ public class GameFrame extends JFrame implements GameController.GameEventListene
 
     private void loadSettingsAndHistory() {
         try {
-            if (settings.loadTheme().equals("pastel")) theme = new PastelLilacTheme();
+            if (storage.loadTheme().equals("pastel")) theme = new PastelLilacTheme();
         } catch (IOException e) {
             laterError("Не вдалося завантажити тему");
         }
         try {
-            statistics = new StatisticsService(new FileGameHistoryRepository(Path.of("data", "history.csv")));
+            statistics = new StatisticsService(storage);
         } catch (IOException e) {
             laterError("Не вдалося прочитати історію. Файл залишено без змін.");
         }
@@ -113,13 +107,13 @@ public class GameFrame extends JFrame implements GameController.GameEventListene
 
     private void restoreOrStart() {
         try {
-            Optional<SavedGame> saved = saves.load();
-            if (saved.isPresent()) {
-                if (statistics == null || !statistics.contains(saved.get().id())) {
-                    installController(new GameController(saved.get()));
+            SavedGame saved = storage.loadGame();
+            if (saved != null) {
+                if (statistics == null || !statistics.contains(saved.id())) {
+                    installController(new GameController(saved));
                     return;
                 }
-                saves.clear();
+                storage.clearGame();
             }
         } catch (IOException e) {
             laterError("Не вдалося відновити збережену гру");
@@ -127,44 +121,50 @@ public class GameFrame extends JFrame implements GameController.GameEventListene
         installController(new GameController(GameConfig.preset(Difficulty.BEGINNER)));
     }
 
-    private <T> T withDialog(Supplier<T> action) {
+    private void openDialog(StyledDialog dialog) {
         GameController current = controller;
-        if (current != null) current.addPause(PauseReason.DIALOG);
-        try { return action.get(); }
-        finally { if (current != null) current.removePause(PauseReason.DIALOG); }
+        boolean addedPause = current.addPause(PauseReason.DIALOG);
+        try {
+            dialog.showDialog();
+        } finally {
+            if (addedPause) current.removePause(PauseReason.DIALOG);
+        }
     }
     private void showSettings() {
-        withDialog(() -> new SettingsDialog(this, theme).choose()).ifPresent(selected -> {
-            theme = selected;
+        SettingsDialog dialog = new SettingsDialog(this, theme);
+        openDialog(dialog);
+        if (dialog.getSelectedTheme() != null) {
+            theme = dialog.getSelectedTheme();
             applyTheme();
             try {
-                settings.saveTheme(theme instanceof PastelLilacTheme ? "pastel" : "twilight");
+                storage.saveTheme(theme instanceof PastelLilacTheme ? "pastel" : "twilight");
             } catch (IOException e) { message("Помилка", "Не вдалося зберегти тему"); }
-        });
+        }
     }
     private void showStatistics() {
         if (statistics == null) {
             message("Статистика", "Історія недоступна. Перевірте файл data/history.csv.");
             return;
         }
-        withDialog(() -> {
-            new StatisticsDialog(this, theme, statistics, legacyRecords).showDialog();
-            return null;
-        });
+        openDialog(new StatisticsDialog(this, theme, statistics));
     }
     private void selectDifficulty(Difficulty difficulty) {
         if (difficulty == Difficulty.CUSTOM) {
-            withDialog(() -> new CustomBoardDialog(this, theme, controller.getSession().getConfig()).choose())
-                    .ifPresent(this::startNewGame);
+            CustomBoardDialog dialog = new CustomBoardDialog(this, theme, controller.getSession().getConfig());
+            openDialog(dialog);
+            if (dialog.getConfig() != null) startNewGame(dialog.getConfig());
         } else startNewGame(GameConfig.preset(difficulty));
     }
     private void restartGame() { startNewGame(controller.getSession().getConfig()); }
+    private boolean hasProgress() {
+        Board board = controller.getBoard();
+        return controller.hasStarted() || board.getRemainingMines() != board.getTotalMines();
+    }
     private void startNewGame(GameConfig config) {
-        if (controller.isPlaying() && (controller.hasStarted()
-                || controller.getBoard().getRemainingMines() != controller.getBoard().getTotalMines())
+        if (controller.isPlaying() && hasProgress()
                 && !confirm("Нова гра", "Поточна партія буде завершена як перервана.", "Почати нову")) return;
         try {
-            saves.clear();
+            storage.clearGame();
         } catch (IOException e) {
             message("Помилка", "Не вдалося видалити попереднє збереження.");
             return;
@@ -198,25 +198,27 @@ public class GameFrame extends JFrame implements GameController.GameEventListene
     }
     private void saveGame() {
         if (!controller.isPlaying()) return;
-        withDialog(() -> {
-            try {
-                saves.save(controller.snapshot());
-                showMessage("Гру збережено", "Після наступного запуску можна продовжити партію.");
-            } catch (IOException e) { showMessage("Помилка", "Не вдалося зберегти гру."); }
-            return null;
-        });
+        boolean addedPause = controller.addPause(PauseReason.DIALOG);
+        try {
+            storage.saveGame(controller.snapshot());
+            message("Гру збережено", "Після наступного запуску можна продовжити партію.");
+        } catch (IOException e) {
+            message("Помилка", "Не вдалося зберегти гру.");
+        } finally {
+            if (addedPause) controller.removePause(PauseReason.DIALOG);
+        }
     }
     private void closeGame() {
         if (controller.isPlaying()) {
             controller.addPause(PauseReason.DIALOG);
             try {
-                if (controller.hasStarted() || controller.getBoard().getRemainingMines() != controller.getBoard().getTotalMines()) {
-                    saves.save(controller.snapshot());
+                if (hasProgress()) {
+                    storage.saveGame(controller.snapshot());
                 } else {
-                    saves.clear();
+                    storage.clearGame();
                 }
             } catch (IOException e) {
-                if (!showConfirmation("Помилка збереження", "Закрити гру без збереження?", "Закрити")) {
+                if (!confirm("Помилка збереження", "Закрити гру без збереження?", "Закрити")) {
                     controller.removePause(PauseReason.DIALOG);
                     return;
                 }
@@ -225,32 +227,20 @@ public class GameFrame extends JFrame implements GameController.GameEventListene
         dispose();
     }
     private boolean confirm(String title, String text, String accept) {
-        return withDialog(() -> showConfirmation(title, text, accept));
-    }
-    private boolean showConfirmation(String title, String text, String accept) {
         StyledDialog dialog = new StyledDialog(this, title, text, theme);
-        boolean[] accepted = {false};
-        dialog.addActions(dialog.actionButton("Скасувати", false, dialog::dispose),
-                dialog.actionButton(accept, true, () -> { accepted[0] = true; dialog.dispose(); }));
-        dialog.showDialog();
-        return accepted[0];
+        dialog.addConfirmation(accept);
+        openDialog(dialog);
+        return dialog.isConfirmed();
     }
     private void message(String title, String text) {
-        withDialog(() -> { showMessage(title, text); return null; });
-    }
-    private void showMessage(String title, String text) {
         StyledDialog dialog = new StyledDialog(this, title, text, theme);
         dialog.addActions(dialog.actionButton("Добре", true, dialog::dispose));
-        dialog.showDialog();
+        openDialog(dialog);
     }
     private void laterError(String text) { SwingUtilities.invokeLater(() -> message("Помилка", text)); }
     private boolean recordResult(GameResult result) {
         if (statistics == null) return false;
         boolean personalBest = statistics.isNewRecord(result);
-        if (result.qualifiesForRecord()) {
-            Optional<Integer> old = legacyRecords.getBestTime(result.config().difficulty());
-            personalBest &= old.isEmpty() || result.seconds() < old.get();
-        }
         try {
             statistics.record(result);
             return personalBest;
@@ -288,7 +278,7 @@ public class GameFrame extends JFrame implements GameController.GameEventListene
         GameResult result = GameResult.from(controller.getSession(),
                 state == GameState.WON ? GameOutcome.WON : GameOutcome.LOST, controller.getSecondsElapsed());
         boolean newRecord = recordResult(result);
-        try { saves.clear(); }
+        try { storage.clearGame(); }
         catch (IOException e) { message("Помилка", "Не вдалося очистити збереження завершеної гри."); }
         new GameResultDialog(this, theme, state, result.seconds(), board.getRevealedCellsCount(),
                 result.config().safeCells(), newRecord, result.hintsUsed(), this::restartGame).showDialog();

@@ -4,7 +4,6 @@ import ui.components.*;
 import ui.theme.*;
 import javax.swing.*;
 import java.awt.*;
-import java.util.Optional;
 
 public class SettingsDialog extends StyledDialog {
     private final GameTheme[] themes = { new TwilightTheme(), new PastelLilacTheme() };
@@ -33,8 +32,7 @@ public class SettingsDialog extends StyledDialog {
         addActions(actionButton("Скасувати", false, this::dispose), apply);
         getRootPane().setDefaultButton(apply);
     }
-    public Optional<GameTheme> choose() {
-        showDialog();
-        return Optional.ofNullable(selected);
+    public GameTheme getSelectedTheme() {
+        return selected;
     }
 }

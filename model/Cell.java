@@ -12,10 +12,6 @@ public class Cell {
     public Cell(int row, int col) {
         this.row = row;
         this.col = col;
-        this.isMine = false;
-        this.isRevealed = false;
-        this.isFlagged = false;
-        this.adjacentMines = 0;
     }
 
     public int getRow() {
@@ -40,6 +36,14 @@ public class Cell {
 
     public boolean isFlagged() {
         return isFlagged;
+    }
+
+    public boolean isClosed() {
+        return !isRevealed && !isFlagged;
+    }
+
+    public boolean isSafeClosed() {
+        return !isMine && isClosed();
     }
 
     public boolean isExploded() {
@@ -71,6 +75,23 @@ public class Cell {
     public void toggleFlag() {
         if (!isRevealed) {
             isFlagged = !isFlagged;
+        }
+    }
+
+    char saveCode() {
+        if (isFlagged) return isMine ? '5' : '4';
+        if (isRevealed) return '2';
+        return isMine ? '1' : '0';
+    }
+
+    void restoreCode(char code) {
+        switch (code) {
+            case '0': break;
+            case '1': isMine = true; break;
+            case '2': isRevealed = true; break;
+            case '4': isFlagged = true; break;
+            case '5': isMine = true; isFlagged = true; break;
+            default: throw new IllegalArgumentException("Некоректний стан клітинки");
         }
     }
 }

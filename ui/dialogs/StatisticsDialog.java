@@ -1,7 +1,6 @@
 package ui.dialogs;
 
 import model.*;
-import record.ScoreRecord;
 import service.StatisticsService;
 import ui.components.RoundedPanel;
 import ui.theme.GameTheme;
@@ -16,12 +15,10 @@ public class StatisticsDialog extends StyledDialog {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
             .withZone(ZoneId.systemDefault());
     private final StatisticsService statistics;
-    private final ScoreRecord legacyRecords;
 
-    public StatisticsDialog(JFrame owner, GameTheme theme, StatisticsService statistics, ScoreRecord legacyRecords) {
+    public StatisticsDialog(JFrame owner, GameTheme theme, StatisticsService statistics) {
         super(owner, "Статистика", "Твої результати та історія ігор", theme);
         this.statistics = statistics;
-        this.legacyRecords = legacyRecords;
         JTabbedPane tabs = new JTabbedPane();
         tabs.setFont(new Font("SansSerif", Font.BOLD, 14));
         tabs.setBackground(theme.getHiddenCellBg());
@@ -82,7 +79,8 @@ public class StatisticsDialog extends StyledDialog {
                 GameResult r = top.get(i);
                 model.addRow(new Object[]{i + 1, DATE.format(r.date()), duration(r.seconds()), r.config().sizeLabel()});
             }
-            String legacy = legacyRecords.getBestTime(d).map(t -> "  •  Старий рекорд: " + duration(t)).orElse("");
+            Integer old = statistics.getLegacyRecord(d);
+            String legacy = old == null ? "" : "  •  Старий рекорд: " + duration(old);
             note.setText("Тільки перемоги без підказок" + legacy + (top.isEmpty() ? "  •  Немає нових рекордів" : ""));
         };
         filter.addActionListener(e -> fill.run());

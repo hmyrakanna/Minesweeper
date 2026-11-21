@@ -11,7 +11,7 @@ public class GameSession {
     private CellPosition hint;
 
     public GameSession(GameConfig config) {
-        this(UUID.randomUUID(), config, new Board(config.width(), config.height(), config.mines(), new FirstClick()), 0, null);
+        this(UUID.randomUUID(), config, new Board(config), 0, null);
     }
 
     private GameSession(UUID id, GameConfig config, Board board, int hintsUsed, CellPosition hint) {
@@ -25,8 +25,10 @@ public class GameSession {
     public static GameSession restore(UUID id, GameConfig config, boolean started, String cells,
                                       int hintsUsed, CellPosition hint) {
         Board board = Board.restore(config, started, cells);
-        if (hintsUsed < 0 || hintsUsed > MAX_HINTS || !started && hintsUsed != 0
-                || hint != null && (hintsUsed == 0 || !isSafeTarget(board, hint))) {
+        if (hintsUsed < 0 || hintsUsed > MAX_HINTS || (!started && hintsUsed != 0)) {
+            throw new IllegalArgumentException("Некоректна кількість підказок");
+        }
+        if (hint != null && (hintsUsed == 0 || !isSafeTarget(board, hint))) {
             throw new IllegalArgumentException("Некоректні підказки");
         }
         return new GameSession(id, config, board, hintsUsed, hint);
@@ -51,6 +53,6 @@ public class GameSession {
         if (p == null || p.row() < 0 || p.row() >= board.getHeight()
                 || p.col() < 0 || p.col() >= board.getWidth()) return false;
         Cell cell = board.getCell(p.row(), p.col());
-        return !cell.isMine() && !cell.isFlagged() && !cell.isRevealed();
+        return cell.isSafeClosed();
     }
 }
